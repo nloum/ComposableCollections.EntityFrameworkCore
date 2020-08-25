@@ -1,8 +1,7 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 
-namespace LiveLinq.EntityFramework
+namespace ComposableCollections.EntityFrameworkCore
 {
     public class AnonymousEntityFrameworkCoreDictionary<TId, TDbDto, TDbContext> : EntityFrameworkCoreDictionaryBase<TId, TDbDto, TDbContext> where TDbDto : class where TDbContext : DbContext
     {

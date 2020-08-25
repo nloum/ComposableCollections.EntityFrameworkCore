@@ -1,9 +1,8 @@
 using System;
 using ComposableCollections.Common;
-using ComposableCollections.Dictionary;
 using Microsoft.EntityFrameworkCore;
 
-namespace LiveLinq.EntityFramework
+namespace ComposableCollections.EntityFrameworkCore
 {
     public class TransactionalDatabase
     {

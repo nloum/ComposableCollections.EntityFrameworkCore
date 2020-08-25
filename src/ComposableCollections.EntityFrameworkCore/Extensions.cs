@@ -1,10 +1,8 @@
 using System;
-using AutoMapper;
-using ComposableCollections.Dictionary;
 using ComposableCollections.Dictionary.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace LiveLinq.EntityFramework
+namespace ComposableCollections.EntityFrameworkCore
 {
     public static class Extensions
     {

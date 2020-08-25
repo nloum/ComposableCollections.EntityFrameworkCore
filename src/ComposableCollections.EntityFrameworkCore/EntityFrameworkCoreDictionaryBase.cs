@@ -9,7 +9,7 @@ using ComposableCollections.Dictionary.Write;
 using Microsoft.EntityFrameworkCore;
 using SimpleMonads;
 
-namespace LiveLinq.EntityFramework
+namespace ComposableCollections.EntityFrameworkCore
 {
     public abstract class EntityFrameworkCoreDictionaryBase<TId, TDbDto, TDbContext> : DictionaryBase<TId, TDbDto> where TDbDto : class where TDbContext : DbContext
     {
