@@ -1,8 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30413.136
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "_build", "..\build\_build.csproj", "{BD0FCEDD-3295-4CA2-925B-34FE1073F33A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ComposableCollections.EntityFrameworkCore", "ComposableCollections.EntityFrameworkCore\ComposableCollections.EntityFrameworkCore.csproj", "{4E46A885-47E6-4247-A168-5EF4AF90266A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ComposableCollections.EntityFrameworkCore", "ComposableCollections.EntityFrameworkCore\ComposableCollections.EntityFrameworkCore.csproj", "{4E46A885-47E6-4247-A168-5EF4AF90266A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ComposableCollections.EntityFrameworkCore.Tests", "ComposableCollections.EntityFrameworkCore.Tests\ComposableCollections.EntityFrameworkCore.Tests.csproj", "{D6BEF97B-86CB-4A82-AC92-31958D9B4012}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,5 +21,15 @@ Global
 		{4E46A885-47E6-4247-A168-5EF4AF90266A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E46A885-47E6-4247-A168-5EF4AF90266A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E46A885-47E6-4247-A168-5EF4AF90266A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6BEF97B-86CB-4A82-AC92-31958D9B4012}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6BEF97B-86CB-4A82-AC92-31958D9B4012}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6BEF97B-86CB-4A82-AC92-31958D9B4012}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6BEF97B-86CB-4A82-AC92-31958D9B4012}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2C163EC3-B391-473C-9CEA-F36C5355B50E}
 	EndGlobalSection
 EndGlobal
