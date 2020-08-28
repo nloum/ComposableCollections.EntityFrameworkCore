@@ -1,4 +1,5 @@
 ﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ComposableCollections.EntityFrameworkCore.Tests.Migrations
 {

@@ -1,56 +1,85 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
+using System.Linq.Expressions;
 using AutoMapper;
 using ComposableCollections.Dictionary;
 using ComposableCollections.Dictionary.Base;
+using ComposableCollections.Dictionary.Interfaces;
 using ComposableCollections.Dictionary.Write;
 using Microsoft.EntityFrameworkCore;
 using SimpleMonads;
 
 namespace ComposableCollections.EntityFrameworkCore
 {
-    public abstract class EntityFrameworkCoreDictionaryBase<TId, TDbDto, TDbContext> : DictionaryBase<TId, TDbDto> where TDbDto : class where TDbContext : DbContext
+    public class EntityFrameworkCoreDictionary<TId, TDbDto, TDbContext> : DictionaryBase<TId, TDbDto>, IQueryableDictionary<TId, TDbDto> where TDbDto : class where TDbContext : DbContext
     {
         private readonly TDbContext _dbContext;
         private readonly DbSet<TDbDto> _dbSet;
         private readonly IMapper _mapper;
+        private readonly Expression<Func<TDbDto, TId>> _getKey;
+        private readonly Func<TId, Expression<Func<TDbDto, bool>>> _compareKey;
+        private readonly Expression<Func<TDbDto, IKeyValue<TId, TDbDto>>> _getKeyValue;
 
-        protected abstract TId GetId(TDbDto dbDto);
-        protected abstract TDbDto Find(DbSet<TDbDto> dbSet, TId id);
-
-        protected EntityFrameworkCoreDictionaryBase(TDbContext dbContext, DbSet<TDbDto> dbSet)
+        public EntityFrameworkCoreDictionary(TDbContext dbContext, DbSet<TDbDto> dbSet, Expression<Func<TDbDto, TId>> getKey)
         {
             _dbContext = dbContext;
             _dbSet = dbSet;
+            _getKey = getKey;
+            
             var mapperConfig = new MapperConfiguration(cfg =>
             {
                 cfg.CreateMap<TDbDto, TDbDto>();
             });
 
             _mapper = mapperConfig.CreateMapper();
+            
+            var memberExpression = getKey.Body as MemberExpression;
+            _compareKey = key =>
+            {
+                var parameter = Expression.Parameter(typeof(TDbDto), "p1");
+                var equality = Expression.Equal(Expression.MakeMemberAccess(parameter, memberExpression.Member), Expression.Constant(key, typeof(TId)));
+                var result = Expression.Lambda<Func<TDbDto, bool>>(equality, parameter);
+                return result;
+            };
+
+            var valueParameter = Expression.Parameter(typeof(TDbDto), "p1");
+            var body = Expression.New(typeof(KeyValue<TId, TDbDto>).GetConstructor(new[] {typeof(TId), typeof(TDbDto)}),
+                Expression.MakeMemberAccess(valueParameter, memberExpression.Member),
+                valueParameter);
+            _getKeyValue = Expression.Lambda<Func<TDbDto, IKeyValue<TId, TDbDto>>>(body, valueParameter);
         }
 
-        public override bool TryGetValue(TId key, out TDbDto value)
+        IEnumerator IEnumerable.GetEnumerator()
         {
-            value = Find(_dbSet, key);
-            return value != null;
+            return GetEnumerator();
         }
 
         public override IEnumerator<IKeyValue<TId, TDbDto>> GetEnumerator()
         {
-            return _dbSet.AsEnumerable().Select(value => new KeyValue<TId, TDbDto>(GetId(value), value)).ToImmutableList().GetEnumerator();
+            return _dbSet.Select(_getKeyValue).AsEnumerable().GetEnumerator();
         }
 
+        public override IEnumerable<TDbDto> Values => _dbSet;
+        IQueryable<TDbDto> IQueryableReadOnlyDictionary<TId, TDbDto>.Values => _dbSet;
+
         public override int Count => _dbSet.Count();
+        public override IEqualityComparer<TId> Comparer => EqualityComparer<TId>.Default;
 
-        public override IEqualityComparer<TId> Comparer { get; } = EqualityComparer<TId>.Default;
+        public override IEnumerable<TId> Keys => _dbSet.Select(_getKey);
 
-        public override IEnumerable<TId> Keys => this.Select(kvp => kvp.Key);
+        public override bool ContainsKey(TId key)
+        {
+            return _dbSet.Where(_compareKey(key)).FirstOrDefault() != null;
+        }
 
-        public override IEnumerable<TDbDto> Values => this.Select(kvp => kvp.Value);
-        
+        public override bool TryGetValue(TId key, out TDbDto value)
+        {
+            value = _dbSet.Where(_compareKey(key)).FirstOrDefault();
+            return value != null;
+        }
+
         public override void Write(IEnumerable<DictionaryWrite<TId, TDbDto>> mutations, out IReadOnlyList<DictionaryWriteResult<TId, TDbDto>> results)
         {
             var finalResults = new List<DictionaryWriteResult<TId, TDbDto>>();
@@ -64,8 +93,7 @@ namespace ComposableCollections.EntityFrameworkCore
                     {
                         if (mutation.Type == DictionaryWriteType.Add)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 _dbContext.Entry(preExistingValue).State = EntityState.Detached;
                                 throw new InvalidOperationException("Cannot add an item when an item with that key already exists");
@@ -77,8 +105,7 @@ namespace ComposableCollections.EntityFrameworkCore
                         }
                         else if (mutation.Type == DictionaryWriteType.TryAdd)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 _dbContext.Entry(preExistingValue).State = EntityState.Detached;
                                 finalResults.Add(DictionaryWriteResult<TId, TDbDto>.CreateAdd(mutation.Key, false, preExistingValue.ToMaybe(), Maybe<TDbDto>.Nothing()));
@@ -92,8 +119,7 @@ namespace ComposableCollections.EntityFrameworkCore
                         }
                         else if (mutation.Type == DictionaryWriteType.Update)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 var oldPreExistingValue = _mapper.Map<TDbDto, TDbDto>(preExistingValue);
 
@@ -109,8 +135,7 @@ namespace ComposableCollections.EntityFrameworkCore
                         }
                         else if (mutation.Type == DictionaryWriteType.TryUpdate)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 var oldPreExistingValue = _mapper.Map<TDbDto, TDbDto>(preExistingValue);
                                 var updatedValue = mutation.ValueIfUpdating.Value(preExistingValue);
@@ -125,8 +150,7 @@ namespace ComposableCollections.EntityFrameworkCore
                         }
                         else if (mutation.Type == DictionaryWriteType.Remove)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 _dbContext.Entry(preExistingValue).State = EntityState.Detached;
                                 _dbSet.Remove(preExistingValue);
@@ -139,8 +163,7 @@ namespace ComposableCollections.EntityFrameworkCore
                         }
                         else if (mutation.Type == DictionaryWriteType.TryRemove)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 _dbContext.Entry(preExistingValue).State = EntityState.Detached;
                                 _dbSet.Remove(preExistingValue);
@@ -153,8 +176,7 @@ namespace ComposableCollections.EntityFrameworkCore
                         }
                         else if (mutation.Type == DictionaryWriteType.AddOrUpdate)
                         {
-                            var preExistingValue = Find(_dbSet, mutation.Key);
-                            if (preExistingValue != null)
+                            if (TryGetValue(mutation.Key, out var preExistingValue))
                             {
                                 var oldPreExistingValue = _mapper.Map<TDbDto, TDbDto>(preExistingValue);
                                 var updatedValue = mutation.ValueIfUpdating.Value(preExistingValue);

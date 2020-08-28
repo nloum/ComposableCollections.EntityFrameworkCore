@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq.Expressions;
 using System.Reactive.Subjects;
 using AutoMapper;
+using LiveLinq;
 using LiveLinq.Dictionary;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -30,24 +32,24 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
     }
     
     public class WorkItem {
-        public WorkItem(Guid id)
-        {
-            Id = id;
-        }
+        // public WorkItem(Guid id)
+        // {
+        //     Id = id;
+        // }
 
-        public Guid Id { get; }
+        public Guid Id { get; set; }
         public string Description { get; set; }
         public Person AssignedTo { get; set; }
     }
 
     public class Person
     {
-        public Person(Guid id)
-        {
-            Id = id;
-        }
+        // public Person(Guid id)
+        // {
+        //     Id = id;
+        // }
 
-        public Guid Id { get; }
+        public Guid Id { get; set; }
         public string Name { get; set; }
         public ICollection<WorkItem> AssignedWorkItems { get; set; }
     }
@@ -118,13 +120,13 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             {
                 cfg.CreateMap<WorkItem, WorkItemDto>()
                     .ConstructUsing(preserveReferencesState)
-                    .ReverseMap()
-                    .ConstructUsing(preserveReferencesState, dto => new WorkItem(dto.Id));
+                    .ReverseMap();
+                    //.ConstructUsing(preserveReferencesState, dto => new WorkItem(dto.Id));
 
-                cfg.CreateMap<Person, PersonDto>()
-                    .ConstructUsing(preserveReferencesState)
-                    .ReverseMap()
-                    .ConstructUsing(preserveReferencesState, dto => new Person(dto.Id));
+                    cfg.CreateMap<Person, PersonDto>()
+                        .ConstructUsing(preserveReferencesState)
+                        .ReverseMap();
+                    //.ConstructUsing(preserveReferencesState, dto => new Person(dto.Id));
             });
 
             var mapper = mapperConfig.CreateMapper();
@@ -136,25 +138,25 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             var infrastructure = start.Select(
                 dbContext =>
                 {
-                    var tasks = dbContext.AsComposableReadOnlyDictionary(x => x.WorkItem, x => x.Id)
-                        .WithMapping<Guid, WorkItem, WorkItemDto>(mapper)
+                    var tasks = dbContext.AsQueryableReadOnlyDictionary(x => x.WorkItem, x => x.Id)
+                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapperConfig, mapper)
                         .WithLiveLinq(taskChanges)
                         .WithBuiltInKey(t => t.Id);
-                    var people = dbContext.AsComposableReadOnlyDictionary(x => x.Person, x => x.Id)
-                        .WithMapping<Guid, Person, PersonDto>(mapper)
+                    var people = dbContext.AsQueryableReadOnlyDictionary(x => x.Person, x => x.Id)
+                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapperConfig, mapper)
                         .WithLiveLinq(peopleChanges)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, dbContext);
                 },
                 dbContext =>
                 {
-                    var tasks = dbContext.AsComposableDictionary(x => x.WorkItem, x => x.Id)
-                        .WithMapping<Guid, WorkItem, WorkItemDto>(mapper)
-                        .WithLiveLinq(taskChanges)
+                    var tasks = dbContext.AsQueryableDictionary(x => x.WorkItem, x => x.Id)
+                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapperConfig, mapper)
+                        .WithLiveLinq(taskChanges, taskChanges.OnNext)
                         .WithBuiltInKey(t => t.Id);
-                    var people = dbContext.AsComposableDictionary(x => x.Person, x => x.Id)
-                        .WithMapping<Guid, Person, PersonDto>(mapper)
-                        .WithLiveLinq(peopleChanges)
+                    var people = dbContext.AsQueryableDictionary(x => x.Person, x => x.Id)
+                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapperConfig, mapper)
+                        .WithLiveLinq(peopleChanges, peopleChanges.OnNext)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, new AnonymousDisposable(() =>
                     {
@@ -168,15 +170,17 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             
             using (var transaction = infrastructure.BeginWrite())
             {
-                var joe = new Person(joeId)
+                var joe = new Person()
                 {
+                    Id = joeId,
                     Name = "Joe"
                 };
 
                 transaction.People.Add(joe);
             
-                var washTheCar = new WorkItem(taskId)
+                var washTheCar = new WorkItem()
                 {
+                    Id = taskId,
                     Description = "Wash the car",
                     AssignedTo = joe
                 };
