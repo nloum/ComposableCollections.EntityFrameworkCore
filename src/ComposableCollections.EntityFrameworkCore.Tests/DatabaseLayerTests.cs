@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reactive.Subjects;
 using AutoMapper;
+using FluentAssertions;
 using LiveLinq;
 using LiveLinq.Dictionary;
 using Microsoft.EntityFrameworkCore;
@@ -139,11 +141,11 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 dbContext =>
                 {
                     var tasks = dbContext.AsQueryableReadOnlyDictionary(x => x.WorkItem, x => x.Id)
-                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapperConfig, mapper)
+                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
                         .WithLiveLinq(taskChanges)
                         .WithBuiltInKey(t => t.Id);
                     var people = dbContext.AsQueryableReadOnlyDictionary(x => x.Person, x => x.Id)
-                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapperConfig, mapper)
+                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
                         .WithLiveLinq(peopleChanges)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, dbContext);
@@ -151,11 +153,11 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 dbContext =>
                 {
                     var tasks = dbContext.AsQueryableDictionary(x => x.WorkItem, x => x.Id)
-                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapperConfig, mapper)
+                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
                         .WithLiveLinq(taskChanges, taskChanges.OnNext)
                         .WithBuiltInKey(t => t.Id);
                     var people = dbContext.AsQueryableDictionary(x => x.Person, x => x.Id)
-                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapperConfig, mapper)
+                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
                         .WithLiveLinq(peopleChanges, peopleChanges.OnNext)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, new AnonymousDisposable(() =>
@@ -192,6 +194,16 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             {
                 var joe = transaction.People[joeId];
                 var washTheCar = transaction.Tasks[taskId];
+                joe.Name.Should().Be("Joe");
+                joe.Id.Should().Be(joeId);
+                joe.AssignedWorkItems.Count.Should().Be(1);
+                joe.AssignedWorkItems.First().Id.Should().Be(taskId);
+                joe.AssignedWorkItems.First().Description.Should().Be("Wash the car");
+
+                washTheCar.Id.Should().Be(taskId);
+                washTheCar.Description.Should().Be("Wash the car");
+                washTheCar.AssignedTo.Id.Should().Be(joeId);
+                washTheCar.AssignedTo.Name.Should().Be("Joe");
             }
         }
     }
