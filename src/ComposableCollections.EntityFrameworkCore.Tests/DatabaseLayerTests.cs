@@ -109,7 +109,7 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
     public class DatabaseLayerTests
     {
         [TestMethod]
-        public void ShouldHandleManyToOneRelationships()
+        public void ShouldHandleManyToOneRelationshipsWithMultipleTypesOfEntitiesInOneTransaction()
         {
             if (File.Exists("tasks.db"))
             {
@@ -142,11 +142,11 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 {
                     var tasks = dbContext.AsQueryableReadOnlyDictionary(x => x.WorkItem, x => x.Id)
                         .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
-                        .WithLiveLinq(taskChanges)
+                        .WithChangeNotifications(taskChanges)
                         .WithBuiltInKey(t => t.Id);
                     var people = dbContext.AsQueryableReadOnlyDictionary(x => x.Person, x => x.Id)
                         .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
-                        .WithLiveLinq(peopleChanges)
+                        .WithChangeNotifications(peopleChanges)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, dbContext);
                 },
@@ -154,11 +154,11 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 {
                     var tasks = dbContext.AsQueryableDictionary(x => x.WorkItem, x => x.Id)
                         .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
-                        .WithLiveLinq(taskChanges, taskChanges.OnNext)
+                        .WithChangeNotifications(taskChanges, taskChanges.OnNext)
                         .WithBuiltInKey(t => t.Id);
                     var people = dbContext.AsQueryableDictionary(x => x.Person, x => x.Id)
                         .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
-                        .WithLiveLinq(peopleChanges, peopleChanges.OnNext)
+                        .WithChangeNotifications(peopleChanges, peopleChanges.OnNext)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, new AnonymousDisposable(() =>
                     {
@@ -194,6 +194,86 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             {
                 var joe = transaction.People[joeId];
                 var washTheCar = transaction.Tasks[taskId];
+                joe.Name.Should().Be("Joe");
+                joe.Id.Should().Be(joeId);
+                joe.AssignedWorkItems.Count.Should().Be(1);
+                joe.AssignedWorkItems.First().Id.Should().Be(taskId);
+                joe.AssignedWorkItems.First().Description.Should().Be("Wash the car");
+
+                washTheCar.Id.Should().Be(taskId);
+                washTheCar.Description.Should().Be("Wash the car");
+                washTheCar.AssignedTo.Id.Should().Be(joeId);
+                washTheCar.AssignedTo.Name.Should().Be("Joe");
+            }
+        }
+        
+        [TestMethod]
+        public void ShouldHandleManyToOneRelationshipsWithOneTypeOfEntitiesInOneTransaction()
+        {
+            if (File.Exists("tasks.db"))
+            {
+                File.Delete("tasks.db");
+            }
+            
+            var preserveReferencesState = new PreserveReferencesState();
+            
+            var mapperConfig = new MapperConfiguration(cfg =>
+            {
+                cfg.CreateMap<WorkItem, WorkItemDto>()
+                    .ConstructUsing(preserveReferencesState)
+                    .ReverseMap();
+                    //.ConstructUsing(preserveReferencesState, dto => new WorkItem(dto.Id));
+
+                    cfg.CreateMap<Person, PersonDto>()
+                        .ConstructUsing(preserveReferencesState)
+                        .ReverseMap();
+                    //.ConstructUsing(preserveReferencesState, dto => new Person(dto.Id));
+            });
+
+            var mapper = mapperConfig.CreateMapper();
+            
+            var peopleChanges = new Subject<IDictionaryChangeStrict<Guid, Person>>();
+            var taskChanges = new Subject<IDictionaryChangeStrict<Guid, WorkItem>>();
+
+            var start = TransactionalDatabase.Create(() => new MyDbContext(), x => x.Database.Migrate());
+            var people = start.Select(x => x.Person, x => x.Id)
+                .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
+                .WithChangeNotifications(peopleChanges, peopleChanges.OnNext)
+                .WithBuiltInKey(x => x.Id);
+            var workItems = start.Select(x => x.WorkItem, x => x.Id)
+                .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
+                .WithChangeNotifications(taskChanges, taskChanges.OnNext)
+                .WithBuiltInKey(x => x.Id);
+
+            var joeId = Guid.NewGuid();
+            var taskId = Guid.NewGuid();
+            
+            using (var peopleRepo = people.BeginWrite())
+            using (var workItemRepo = workItems.BeginWrite())
+            {
+                var joe = new Person()
+                {
+                    Id = joeId,
+                    Name = "Joe"
+                };
+
+                peopleRepo.Add(joe);
+            
+                var washTheCar = new WorkItem()
+                {
+                    Id = taskId,
+                    Description = "Wash the car",
+                    AssignedTo = joe
+                };
+            
+                workItemRepo.Add(washTheCar);   
+            }
+
+            using (var peopleRepo = people.BeginRead())
+            using (var workItemRepo = workItems.BeginRead())
+            {
+                var joe = peopleRepo[joeId];
+                var washTheCar = workItemRepo[taskId];
                 joe.Name.Should().Be("Joe");
                 joe.Id.Should().Be(joeId);
                 joe.AssignedWorkItems.Count.Should().Be(1);
