@@ -4,10 +4,12 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ComposableCollections.EntityFrameworkCore
 {
-    public class TransactionalDatabase
+    public class DbContextFactory<TDbContext> : IReadWriteFactory<TDbContext, TDbContext> where TDbContext : DbContext
     {
-        public static ITransactionalCollection<TDbContext, TDbContext> Create<TDbContext>(Func<TDbContext> create,
-            Action<TDbContext> migrate = null) where TDbContext : DbContext
+        private Func<TDbContext> _create;
+        
+        public DbContextFactory(Func<TDbContext> create,
+            Action<TDbContext> migrate = null)
         {
             if (migrate != null)
             {
@@ -26,8 +28,18 @@ namespace ComposableCollections.EntityFrameworkCore
                     return simpleCreate();
                 };
             }
-            
-            return TransactionalCollection.Create(create, create);
+
+            _create = create;
+        }
+
+        public TDbContext CreateReader()
+        {
+            return _create();
+        }
+
+        public TDbContext CreateWriter()
+        {
+            return _create();
         }
     }
 }

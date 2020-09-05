@@ -136,8 +136,8 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             var peopleChanges = new Subject<IDictionaryChangeStrict<Guid, Person>>();
             var taskChanges = new Subject<IDictionaryChangeStrict<Guid, WorkItem>>();
 
-            var start = TransactionalDatabase.Create(() => new MyDbContext(), x => x.Database.Migrate());
-            var infrastructure = start.Select(
+            var transactionalDatabase = new DbContextFactory<MyDbContext>(() => new MyDbContext(), x => x.Database.Migrate());
+            var infrastructure = transactionalDatabase.Select(
                 dbContext =>
                 {
                     var tasks = dbContext.AsQueryableReadOnlyDictionary(x => x.WorkItem, x => x.Id)
@@ -170,7 +170,7 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             var joeId = Guid.NewGuid();
             var taskId = Guid.NewGuid();
             
-            using (var transaction = infrastructure.BeginWrite())
+            using (var transaction = infrastructure.CreateWriter())
             {
                 var joe = new Person()
                 {
@@ -190,7 +190,7 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 transaction.Tasks.Add(washTheCar);   
             }
 
-            using (var transaction = infrastructure.BeginWrite())
+            using (var transaction = infrastructure.CreateWriter())
             {
                 var joe = transaction.People[joeId];
                 var washTheCar = transaction.Tasks[taskId];
@@ -235,12 +235,14 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             var peopleChanges = new Subject<IDictionaryChangeStrict<Guid, Person>>();
             var taskChanges = new Subject<IDictionaryChangeStrict<Guid, WorkItem>>();
 
-            var start = TransactionalDatabase.Create(() => new MyDbContext(), x => x.Database.Migrate());
-            var people = start.Select(x => x.Person, x => x.Id)
+            var dbContextFactory = new DbContextFactory<MyDbContext>(() => new MyDbContext(), x => x.Database.Migrate());
+            var people = dbContextFactory
+                .WithDatabaseTable(x => x.Person, x => x.Id)
                 .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
                 .WithChangeNotifications(peopleChanges, peopleChanges.OnNext)
                 .WithBuiltInKey(x => x.Id);
-            var workItems = start.Select(x => x.WorkItem, x => x.Id)
+            var workItems = dbContextFactory
+                .WithDatabaseTable(x => x.WorkItem, x => x.Id)
                 .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
                 .WithChangeNotifications(taskChanges, taskChanges.OnNext)
                 .WithBuiltInKey(x => x.Id);
@@ -248,8 +250,8 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             var joeId = Guid.NewGuid();
             var taskId = Guid.NewGuid();
             
-            using (var peopleRepo = people.BeginWrite())
-            using (var workItemRepo = workItems.BeginWrite())
+            using (var peopleRepo = people.CreateWriter())
+            using (var workItemRepo = workItems.CreateWriter())
             {
                 var joe = new Person()
                 {
@@ -269,8 +271,8 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 workItemRepo.Add(washTheCar);   
             }
 
-            using (var peopleRepo = people.BeginRead())
-            using (var workItemRepo = workItems.BeginRead())
+            using (var peopleRepo = people.CreateReader())
+            using (var workItemRepo = workItems.CreateReader())
             {
                 var joe = peopleRepo[joeId];
                 var washTheCar = workItemRepo[taskId];

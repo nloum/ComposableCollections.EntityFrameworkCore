@@ -26,22 +26,22 @@ namespace ComposableCollections.EntityFrameworkCore
         }
 
         public static
-            ITransactionalCollection<IDisposableQueryableReadOnlyDictionary<TId, TDbDto>, IDisposableQueryableDictionary<TId, TDbDto>>
-            Select<TDbContext, TId, TDbDto>(this ITransactionalCollection<TDbContext, TDbContext> source,
+            IReadWriteFactory<IDisposableQueryableReadOnlyDictionary<TId, TDbDto>, IDisposableQueryableDictionary<TId, TDbDto>>
+            WithDatabaseTable<TDbContext, TId, TDbDto>(this IReadWriteFactory<TDbContext, TDbContext> source,
                 Func<TDbContext, DbSet<TDbDto>> dbSet, Expression<Func<TDbDto, TId>> id)
         where TDbDto : class
         where TDbContext : DbContext
         {
-            return new AnonymousTransactionalCollection<IDisposableQueryableReadOnlyDictionary<TId, TDbDto>, IDisposableQueryableDictionary<TId, TDbDto>>(
+            return new AnonymousReadWriteFactory<IDisposableQueryableReadOnlyDictionary<TId, TDbDto>, IDisposableQueryableDictionary<TId, TDbDto>>(
                 () =>
                 {
-                    var dbContext = source.BeginRead();
+                    var dbContext = source.CreateReader();
                     return new DisposableQueryableReadOnlyDictionaryAdapter<TId, TDbDto>(
                         dbContext.AsQueryableReadOnlyDictionary(dbSet, id),
                         dbContext);
                 }, () =>
                 {
-                    var dbContext = source.BeginRead();
+                    var dbContext = source.CreateWriter();
                     return new DisposableQueryableDictionaryAdapter<TId, TDbDto>(
                         dbContext.AsQueryableDictionary(dbSet, id),
                         new AnonymousDisposable(() =>
