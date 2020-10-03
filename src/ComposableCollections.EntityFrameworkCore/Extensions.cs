@@ -2,6 +2,7 @@ using System;
 using System.Linq.Expressions;
 using ComposableCollections.Common;
 using ComposableCollections.Dictionary.Adapters;
+using ComposableCollections.Dictionary.Anonymous;
 using ComposableCollections.Dictionary.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
@@ -36,19 +37,23 @@ namespace ComposableCollections.EntityFrameworkCore
                 () =>
                 {
                     var dbContext = source.CreateReader();
-                    return new DisposableQueryableReadOnlyDictionaryAdapter<TId, TDbDto>(
-                        dbContext.AsQueryableReadOnlyDictionary(dbSet, id),
-                        dbContext);
+                    var queryableReadOnlyDictionary = dbContext.AsQueryableReadOnlyDictionary(dbSet, id);
+                    return new AnonymousDisposableQueryableReadOnlyDictionary<TId, TDbDto>(
+                        queryableReadOnlyDictionary,
+                        dbContext.Dispose,
+                        () => queryableReadOnlyDictionary.Values);
                 }, () =>
                 {
                     var dbContext = source.CreateWriter();
-                    return new DisposableQueryableDictionaryAdapter<TId, TDbDto>(
-                        dbContext.AsQueryableDictionary(dbSet, id),
-                        new AnonymousDisposable(() =>
+                    var queryableDictionary = dbContext.AsQueryableDictionary(dbSet, id);
+                    return new AnonymousDisposableQueryableDictionary<TId, TDbDto>(
+                        queryableDictionary,
+                        () =>
                         {
                             dbContext.SaveChanges();
                             dbContext.Dispose();
-                        }));
+                        },
+                        () => queryableDictionary.Values);
                 });
         }
     }
