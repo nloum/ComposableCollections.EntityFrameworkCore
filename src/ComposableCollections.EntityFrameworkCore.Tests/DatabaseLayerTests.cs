@@ -141,11 +141,11 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 dbContext =>
                 {
                     var tasks = dbContext.AsQueryableReadOnlyDictionary(x => x.WorkItem, x => x.Id)
-                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
+                        .WithAutoMapping<Guid, WorkItemDto, WorkItem>(mapper)
                         .WithChangeNotifications(taskChanges)
                         .WithBuiltInKey(t => t.Id);
                     var people = dbContext.AsQueryableReadOnlyDictionary(x => x.Person, x => x.Id)
-                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
+                        .WithAutoMapping<Guid, PersonDto, Person>(mapper)
                         .WithChangeNotifications(peopleChanges)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, dbContext);
@@ -153,11 +153,11 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
                 dbContext =>
                 {
                     var tasks = dbContext.AsQueryableDictionary(x => x.WorkItem, x => x.Id)
-                        .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
+                        .WithAutoMapping<Guid, WorkItemDto, WorkItem>(mapper)
                         .WithChangeNotifications(taskChanges, taskChanges.OnNext)
                         .WithBuiltInKey(t => t.Id);
                     var people = dbContext.AsQueryableDictionary(x => x.Person, x => x.Id)
-                        .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
+                        .WithAutoMapping<Guid, PersonDto, Person>(mapper)
                         .WithChangeNotifications(peopleChanges, peopleChanges.OnNext)
                         .WithBuiltInKey(p => p.Id);
                     return Transaction.Create(people, tasks, new AnonymousDisposable(() =>
@@ -238,12 +238,12 @@ namespace ComposableCollections.EntityFrameworkCore.Tests
             var dbContextFactory = new DbContextFactory<MyDbContext>(() => new MyDbContext(), x => x.Database.Migrate());
             var people = dbContextFactory
                 .WithDatabaseTable(x => x.Person, x => x.Id)
-                .WithMapping<Guid, PersonDto, Person>(x => x.Id, mapper)
+                .WithAutoMapping<Guid, PersonDto, Person>(mapper)
                 .WithChangeNotifications(peopleChanges, peopleChanges.OnNext)
                 .WithBuiltInKey(x => x.Id);
             var workItems = dbContextFactory
                 .WithDatabaseTable(x => x.WorkItem, x => x.Id)
-                .WithMapping<Guid, WorkItemDto, WorkItem>(x => x.Id, mapper)
+                .WithAutoMapping<Guid, WorkItemDto, WorkItem>(mapper)
                 .WithChangeNotifications(taskChanges, taskChanges.OnNext)
                 .WithBuiltInKey(x => x.Id);
 
